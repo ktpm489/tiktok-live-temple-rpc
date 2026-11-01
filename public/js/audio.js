@@ -1,6 +1,6 @@
 /**
  * TempleAudioEngine
- * - Nhạc nền: Phát trực tiếp file "Nam Mô A Di Đà Phật.m4a" (/assets/bg_chant.m4a) lặp vô tận êm dịu,
+ * - Nhạc nền: Phát file nhạc thiền /assets/music/music1.mp3 lặp vô tận êm dịu (tự chuyển sang nhạc tổng hợp nếu thiếu file),
  *   tự động hạ nhỏ âm lượng (ducking) khi có giọng đọc lời khấn để không bị đè tiếng hay rè/xước.
  * - Pháp khí: Tổng hợp tiếng Mõ gỗ, Đại Hồng Chung, Ống xăm nhẹ nhàng, không vượt ngưỡng 0dBFS.
  * - Giọng đọc: Hàng đợi ZeroTTS phát tuần tự mượt mà.
@@ -13,8 +13,10 @@ class TempleAudioEngine {
     this.bgMusicEnabled = true;
     this.ttsEnabled = true;
     this.ttsVoice = 'maichi';
+    this.standalone = false; // true: không có server ZeroTTS, đọc bằng giọng tiếng Việt của trình duyệt
+    this.viVoice = null;
 
-    // Nhạc nền "Nam Mô A Di Đà Phật.m4a" — mặc định 65%, cho phép chỉnh trực tiếp 0% - 100%
+    // Nhạc nền thiền — mặc định 65%, cho phép chỉnh trực tiếp 0% - 100%
     const savedMusicVol = parseFloat(localStorage.getItem('temple_music_vol'));
     const savedTtsVol = parseFloat(localStorage.getItem('temple_tts_vol'));
     this.bgBaseVolume = Number.isFinite(savedMusicVol) ? Math.max(0, Math.min(1, savedMusicVol)) : 0.65;
@@ -22,7 +24,7 @@ class TempleAudioEngine {
 
     this.useSynthMusicFallback = false;
     this.synthBgTimer = null;
-    this.bgAudio = new Audio('/assets/bg_chant.m4a');
+    this.bgAudio = new Audio('/assets/music/music1.mp3');
     this.bgAudio.loop = true;
     this.bgAudio.preload = 'auto';
     this.bgAudio.volume = this.bgBaseVolume;
@@ -334,6 +336,7 @@ class TempleAudioEngine {
   }
 
   async fetchZeroTtsAudio(text, voice = 'maichi') {
+    if (this.standalone) return { ok: false, error: 'standalone' };
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -372,6 +375,8 @@ class TempleAudioEngine {
         if (item.onStart) item.onStart();
         await this.playWavUrl(audioUrl);
         if (item.onEnd) item.onEnd();
+      } else if (await this.speakBrowser(item)) {
+        // đã đọc bằng giọng trình duyệt
       } else {
         if (item.onStart) item.onStart();
         if (item.onEnd) setTimeout(item.onEnd, 5500);
@@ -391,6 +396,49 @@ class TempleAudioEngine {
         setTimeout(() => this.processTtsQueue(), 250);
       }
     }
+  }
+
+  // Giọng đọc tiếng Việt có sẵn của trình duyệt (dùng khi không có ZeroTTS). Trả về true nếu đã đọc xong.
+  pickViVoice() {
+    try {
+      const vs = speechSynthesis.getVoices().filter((v) => /^vi([-_]|$)/i.test(v.lang));
+      const rank = (v) => (/natural|online|neural/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 1 : 0);
+      this.viVoice = vs.sort((a, b) => rank(b) - rank(a))[0] || null;
+    } catch (_) {
+      this.viVoice = null;
+    }
+    return this.viVoice;
+  }
+
+  speakBrowser(item) {
+    return new Promise((resolve) => {
+      if (!('speechSynthesis' in window)) return resolve(false);
+      const voice = this.viVoice || this.pickViVoice();
+      if (!voice) return resolve(false);
+      try {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(item.text);
+        u.voice = voice;
+        u.lang = voice.lang;
+        u.rate = 0.95;
+        u.volume = this.ttsVolume;
+        let started = false;
+        u.onstart = () => {
+          started = true;
+          this.setBgDucking(true);
+          if (this.onTtsStateChange) this.onTtsStateChange({ speaking: true, synthesizing: false, text: item.text });
+          if (item.onStart) item.onStart();
+        };
+        u.onend = () => {
+          if (item.onEnd) item.onEnd();
+          resolve(true);
+        };
+        u.onerror = () => resolve(started);
+        speechSynthesis.speak(u);
+      } catch (_) {
+        resolve(false);
+      }
+    });
   }
 
   playWavUrl(url) {

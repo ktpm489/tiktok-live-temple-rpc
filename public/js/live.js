@@ -4,6 +4,7 @@
  * - Hiển thị 40 Phật Tử mặc áo lam quỳ hai bên thảm đỏ + thẻ tên người xem
  * - Hiệu ứng người xem bước dọc thảm đỏ lên trước Lư Hương Đồng dâng hương
  * - Giọng đọc ZeroTTS (Mai Chi) + Pháp khí Web Audio
+ * - Chế độ độc lập (không server/TikTok): TempleLocalEngine xử lý nghi thức ngay trong trình duyệt
  */
 (function () {
   const params = new URLSearchParams(window.location.search);
@@ -351,6 +352,12 @@
 
   function updateUIState(st) {
     if (!st) return;
+    if (st.realtime) enterRealtime();
+    const onlineEl = document.getElementById('statOnline');
+    if (onlineEl && typeof st.online === 'number') {
+      onlineEl.textContent = st.online;
+      onlineEl.parentElement.hidden = false;
+    }
 
     document.getElementById('statIncense').textContent = Number(st.totalIncense || 0).toLocaleString('vi-VN');
     document.getElementById('statMerit').textContent = Number(st.totalMerit || 0).toLocaleString('vi-VN');
@@ -471,7 +478,10 @@
   function triggerRitualVisuals(ev) {
     if (!ev) return;
 
-    if (ev.ttsText && ev.type !== 'drawFortune') {
+    // Phòng realtime: chỉ người thực hiện mới nghe lời đọc / thấy tờ quẻ, người khác chỉ thấy hiệu ứng chung
+    const mine = !realtime || !ev.clientId || ev.clientId === clientId;
+
+    if (ev.ttsText && ev.type !== 'drawFortune' && mine) {
       audio.enqueueTts(ev.ttsText, { voice: ev.ttsVoice || 'maichi' });
     }
 
@@ -485,7 +495,8 @@
       }
 
       case 'strikeWoodenFish': {
-        audio.playWoodenFish();
+        // Sự kiện gom nhiều nhịp của cả phòng: gõ tối đa 4 tiếng nối nhau
+        for (let i = 0; i < Math.min(ev.count || 1, 4); i++) setTimeout(() => audio.playWoodenFish(), i * 110);
         pulseHallBowing();
         particles.spawnFloatingMerit(`+${ev.merit} Công Đức`, 890, 935, '#ffd54f');
         break;
@@ -528,7 +539,13 @@
       }
 
       case 'drawFortune': {
+        if (!mine) {
+          showToast(`🎋 ${ev.user} vừa gieo được Quẻ số ${ev.fortune?.number} (${ev.fortune?.rank})`);
+          break;
+        }
         audio.playFortuneShake();
+        const shakeStart = performance.now();
+        shakeFortuneTube(ev.fortune?.number);
         updateCentralWorshipper(
           ev.user,
           ev.avatar,
@@ -536,30 +553,64 @@
           `Thí chủ ${ev.user} đang thành tâm xin quẻ...`,
           false
         );
-        // Chỉ hiển thị tờ Quẻ Xăm đúng thời điểm giọng đọc bắt đầu vang lên!
+        // Tờ Quẻ chỉ hiện sau khi ống xăm lắc xong và đúng lúc giọng đọc bắt đầu vang lên
         audio.enqueueTts(ev.ttsText || '', {
           voice: ev.ttsVoice || 'maichi',
           onStart: () => {
-            audio.playIncenseChime();
-            showFortuneModal(ev.user, ev.fortune);
-            updateCentralWorshipper(
-              ev.user,
-              ev.avatar,
-              `🎋 Quẻ số ${ev.fortune?.number} (${ev.fortune?.rank})`,
-              ev.fortune?.meaning || '',
-              true
-            );
+            const wait = Math.max(0, FORTUNE_SHAKE_MS - (performance.now() - shakeStart));
+            setTimeout(() => {
+              audio.playIncenseChime();
+              showFortuneModal(ev.user, ev.fortune);
+              updateCentralWorshipper(
+                ev.user,
+                ev.avatar,
+                `🎋 Quẻ số ${ev.fortune?.number} (${ev.fortune?.rank})`,
+                ev.fortune?.meaning || '',
+                true
+              );
+            }, wait);
           },
           onEnd: () => {
             clearTimeout(fortuneTimer);
             fortuneTimer = setTimeout(() => {
               document.getElementById('fortuneModal')?.classList.remove('visible');
-            }, 1800);
+              fortuneBusy = false;
+            }, 6000);
           }
         });
         break;
       }
     }
+  }
+
+  // Lắc ống xăm rồi một que xăm rơi ra mang số quẻ
+  const FORTUNE_SHAKE_MS = 1500;
+  let fortuneBusy = false;
+
+  function shakeFortuneTube(number) {
+    const tube = document.getElementById('fortuneCylinder');
+    const stick = document.getElementById('fortuneStick');
+    if (tube) {
+      tube.classList.remove('shaking');
+      void tube.offsetWidth;
+      tube.classList.add('shaking');
+      setTimeout(() => tube.classList.remove('shaking'), FORTUNE_SHAKE_MS);
+    }
+    if (stick) {
+      document.getElementById('fortuneStickNum').textContent = number || '';
+      stick.classList.remove('drop');
+      void stick.offsetWidth;
+      stick.classList.add('drop');
+    }
+  }
+
+  function requestFortune() {
+    if (fortuneBusy) return;
+    fortuneBusy = true;
+    // Nhả khóa nếu vì lý do nào đó không nhận được sự kiện (mất kết nối...)
+    setTimeout(() => { fortuneBusy = false; }, 45000);
+    const { user, wish } = getFormInput();
+    callRpc('temple.drawFortune', { user, topic: wish });
   }
 
   function spawnSkyLantern(user, wish) {
@@ -590,13 +641,22 @@
 
     modal.classList.add('visible');
     clearTimeout(fortuneTimer);
-    fortuneTimer = setTimeout(() => {
-      modal.classList.remove('visible');
-    }, 15000);
+    fortuneTimer = setTimeout(closeFortuneModal, 30000);
   }
 
-  document.getElementById('fortuneModal')?.addEventListener('click', () => {
-    document.getElementById('fortuneModal').classList.remove('visible');
+  function closeFortuneModal() {
+    clearTimeout(fortuneTimer);
+    document.getElementById('fortuneModal')?.classList.remove('visible');
+    fortuneBusy = false;
+  }
+
+  document.getElementById('fortuneModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'fortuneModal') closeFortuneModal();
+  });
+  document.getElementById('fortuneClose')?.addEventListener('click', closeFortuneModal);
+  document.getElementById('fortuneAgain')?.addEventListener('click', () => {
+    closeFortuneModal();
+    setTimeout(requestFortune, 250);
   });
 
   function showGrandCeremonyBanner(user, giftName, merit) {
@@ -613,10 +673,54 @@
   // 8. Kết nối JSON-RPC 2.0 WebSocket & Gửi Lệnh RPC
   let ws = null;
   let rpcId = 1;
+  let wsEverOpened = false;
+  let wsFailures = 0;
+  let standalone = params.get('standalone') === '1' || window.location.protocol === 'file:';
+
+  // Chế độ độc lập: không có server (ví dụ chạy trên Cloudflare Pages) → mọi nghi thức xử lý cục bộ
+  function showWelcomeGate() {
+    const gate = document.getElementById('welcomeGate');
+    if (!gate || document.body.classList.contains('obs-mode')) return;
+    try {
+      const saved = localStorage.getItem('temple_name');
+      if (saved) document.getElementById('welcomeName').value = saved;
+    } catch (_) {}
+    gate.hidden = false;
+  }
+
+  function enterStandalone() {
+    if (document.body.classList.contains('standalone') || !window.TempleLocalEngine) return;
+    standalone = true;
+    audio.standalone = true;
+    document.body.classList.add('standalone');
+    updateUIState(window.TempleLocalEngine.state());
+    showWelcomeGate();
+  }
+
+  // Phòng realtime (Durable Object): nhiều người cùng thấy nghi thức của nhau
+  const clientId = Math.random().toString(36).slice(2, 12);
+  let realtime = false;
+
+  function enterRealtime() {
+    if (realtime) return;
+    realtime = true;
+    audio.standalone = true; // không có ZeroTTS, đọc bằng giọng trình duyệt
+    document.body.classList.add('realtime');
+    showWelcomeGate();
+  }
 
   function connectWebSocket() {
+    if (standalone) {
+      enterStandalone();
+      return;
+    }
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${proto}//${window.location.host}/ws`);
+
+    ws.onopen = () => {
+      wsEverOpened = true;
+      wsFailures = 0;
+    };
 
     ws.onmessage = (event) => {
       try {
@@ -638,13 +742,29 @@
     };
 
     ws.onclose = () => {
+      wsFailures += 1;
+      // Chưa từng kết nối được → không có server, chuyển sang chế độ độc lập ngay
+      if (!wsEverOpened) {
+        standalone = true;
+        enterStandalone();
+        return;
+      }
       setTimeout(connectWebSocket, 2000);
     };
   }
   connectWebSocket();
 
+  function applyRpcResult(result) {
+    if (result?.state) updateUIState(result.state);
+    if (result?.event) triggerRitualVisuals(result.event);
+  }
+
   async function callRpc(method, params = {}) {
     audio.ensureContext();
+    if (standalone) {
+      enterStandalone();
+      return applyRpcResult(window.TempleLocalEngine.call(method, params));
+    }
     const payload = {
       jsonrpc: '2.0',
       id: rpcId++,
@@ -652,18 +772,25 @@
       params
     };
     if (ws && ws.readyState === WebSocket.OPEN) {
+      payload.params = { ...params, clientId };
       ws.send(JSON.stringify(payload));
       return;
     }
-    const res = await fetch('/rpc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data?.result?.state) updateUIState(data.result.state);
-    if (data?.result?.event) triggerRitualVisuals(data.result.event);
-    return data;
+    try {
+      const res = await fetch('/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      applyRpcResult(data?.result);
+      return data;
+    } catch (_) {
+      // Không có server nhận lệnh → xử lý cục bộ
+      standalone = true;
+      enterStandalone();
+      return applyRpcResult(window.TempleLocalEngine.call(method, params));
+    }
   }
 
   function getFormInput() {
@@ -690,31 +817,49 @@
     callRpc('temple.sendPrayer', { user, wish });
   });
 
-  document.getElementById('cardLotus')?.addEventListener('click', () => {
-    const { user, wish } = getFormInput();
-    callRpc('temple.offerGift', {
-      user,
-      giftType: 'lotus',
-      coins: 20,
-      giftName: 'Đài Hoa Sen Vàng',
-      wish
+  // Gõ mõ: chạm 1 lần = 1 tiếng, giữ ngón tay/chuột = gõ liên tục như tụng kinh
+  function bindWoodenFish(el) {
+    if (!el) return;
+    let holdDelay = null;
+    let holdTimer = null;
+    const hit = () => {
+      const { user } = getFormInput();
+      callRpc('temple.strikeWoodenFish', { user, count: 1 });
+      el.classList.remove('tapped');
+      void el.offsetWidth;
+      el.classList.add('tapped');
+    };
+    const stop = () => {
+      clearTimeout(holdDelay);
+      clearInterval(holdTimer);
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      hit();
+      stop();
+      holdDelay = setTimeout(() => {
+        holdTimer = setInterval(hit, 480);
+      }, 420);
     });
-  });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((t) => el.addEventListener(t, stop));
+  }
+  bindWoodenFish(document.getElementById('woodenFishStation'));
+  bindWoodenFish(document.getElementById('cardWoodfish'));
 
-  document.getElementById('woodenFishStation')?.addEventListener('click', () => {
-    const { user } = getFormInput();
-    callRpc('temple.strikeWoodenFish', { user, count: 1 });
-  });
-
-  document.getElementById('bellStation')?.addEventListener('click', () => {
+  function ringBellNow() {
     const { user, wish } = getFormInput();
-    callRpc('temple.ringBell', { user, count: 1, wish, readTts: true });
-  });
+    // Chế độ độc lập: chuông có thể thỉnh liên tục nên không đọc lời nguyện mỗi lần
+    callRpc('temple.ringBell', { user, count: 1, wish, readTts: !standalone });
+    const el = document.getElementById('bellStation');
+    el.classList.remove('ringing');
+    void el.offsetWidth;
+    el.classList.add('ringing');
+  }
+  document.getElementById('bellStation')?.addEventListener('click', ringBellNow);
+  document.getElementById('cardBell')?.addEventListener('click', ringBellNow);
 
-  document.getElementById('fortuneCylinder')?.addEventListener('click', () => {
-    const { user, wish } = getFormInput();
-    callRpc('temple.drawFortune', { user, topic: wish });
-  });
+  document.getElementById('fortuneCylinder')?.addEventListener('click', requestFortune);
+  document.getElementById('cardFortune')?.addEventListener('click', requestFortune);
 
   // Các nút trên Quick RPC Dock bên phải
   document.getElementById('btnRpcIncense')?.addEventListener('click', () => {
@@ -737,10 +882,7 @@
     callRpc('temple.ringBell', { user, count: 1, wish, readTts: true });
   });
 
-  document.getElementById('btnRpcFortune')?.addEventListener('click', () => {
-    const { user, wish } = getFormInput();
-    callRpc('temple.drawFortune', { user, topic: wish });
-  });
+  document.getElementById('btnRpcFortune')?.addEventListener('click', requestFortune);
 
   document.getElementById('btnRpcGiftLotus')?.addEventListener('click', () => {
     const { user, wish } = getFormInput();
@@ -829,6 +971,29 @@
       callRpc('temple.updateSettings', { ttsVolume: +(pct / 100).toFixed(2) });
     });
   }
+
+  // Cổng vào chánh điện (chế độ độc lập): lưu pháp danh, mở âm thanh nhờ thao tác người dùng
+  document.getElementById('welcomeForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('welcomeName').value.trim().replace(/\s+/g, ' ');
+    if (!name) return;
+    try { localStorage.setItem('temple_name', name); } catch (_) {}
+    document.getElementById('inputDevoteeName').value = name;
+    document.getElementById('welcomeGate').hidden = true;
+    audio.ensureContext();
+    callRpc('temple.join', { user: name });
+    callRpc('temple.burnIncense', { user: name, count: 3, wish: getFormInput().wish });
+  });
+
+  // Tên đã lưu cũng áp dụng cho bảng điều khiển
+  try {
+    const savedName = localStorage.getItem('temple_name');
+    if (savedName) document.getElementById('inputDevoteeName').value = savedName;
+  } catch (_) {}
+
+  document.getElementById('dockToggle')?.addEventListener('click', () => {
+    document.body.classList.toggle('dock-open');
+  });
 
   function shortenName(name, maxLen = 13) {
     const str = String(name || '');

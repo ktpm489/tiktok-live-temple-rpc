@@ -239,8 +239,10 @@ body.obs-mode .stage-wrapper {
   gap: 9px;
   padding: 7px 16px;
   border-radius: 999px;
-  background: rgba(16, 4, 3, 0.92);
+  background: linear-gradient(180deg, rgba(40, 10, 6, 0.9), rgba(14, 3, 2, 0.9));
   border: 1.5px solid rgba(244, 193, 80, 0.6);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 232, 158, 0.2);
+  backdrop-filter: blur(6px);
   font-size: 17px;
   font-weight: 600;
   color: var(--ivory);
@@ -355,27 +357,113 @@ body.obs-mode .stage-wrapper {
   z-index: 15;
   cursor: pointer;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 6px 13px;
-  border-radius: 999px;
-  background: rgba(20, 5, 3, 0.88);
-  border: 1.5px solid rgba(244, 193, 80, 0.65);
+  gap: 4px;
+  padding: 10px 16px 9px;
+  border-radius: 26px;
+  background: radial-gradient(circle at 50% 18%, rgba(110, 24, 14, 0.96), rgba(30, 6, 3, 0.96) 78%);
+  border: 2px solid rgba(244, 193, 80, 0.8);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 22px rgba(244, 193, 80, 0.28), inset 0 0 14px rgba(244, 193, 80, 0.14);
   color: var(--gold-bright);
-  font-size: 14px;
-  font-weight: 700;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+}
+.ritual-hotspot:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 34px rgba(255, 224, 130, 0.55), inset 0 0 16px rgba(244, 193, 80, 0.25);
+}
+.ritual-hotspot:active {
+  transform: scale(0.94);
+}
+.hotspot-icon {
+  font-size: 42px;
+  line-height: 1;
+}
+.hotspot-label {
+  white-space: nowrap;
+}
+.ritual-hotspot.tapped .hotspot-icon {
+  animation: woodTap 0.18s ease-out;
+}
+.ritual-hotspot.ringing .hotspot-icon {
+  transform-origin: 50% 0;
+  animation: bellSwing 1.4s ease-out;
+}
+.ritual-hotspot.shaking .hotspot-icon {
+  transform-origin: 50% 100%;
+  animation: tubeShake 0.3s ease-in-out 5;
+}
+@keyframes woodTap {
+  0% { transform: scale(1) rotate(0); }
+  45% { transform: scale(0.82) rotate(-12deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes bellSwing {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(-26deg); }
+  35% { transform: rotate(20deg); }
+  55% { transform: rotate(-12deg); }
+  75% { transform: rotate(7deg); }
+  100% { transform: rotate(0); }
+}
+@keyframes tubeShake {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  25% { transform: rotate(-16deg) translateY(-6px); }
+  75% { transform: rotate(16deg) translateY(-6px); }
+}
+
+/* Que xăm rơi ra từ ống xăm khi gieo quẻ */
+.fortune-stick {
+  position: absolute;
+  z-index: 16;
+  right: 92px;
+  top: 880px;
+  width: 26px;
+  height: 150px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #8a4a1a, #e0a456 45%, #8a4a1a);
+  border: 1.5px solid #3b1a07;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6);
+  color: #fff3b0;
+  font-weight: 800;
+  font-size: 15px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+.fortune-stick span {
+  background: #8c1812;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.fortune-stick.drop {
+  animation: stickDrop 2.4s ease-in 1.1s both;
+}
+@keyframes stickDrop {
+  0% { opacity: 1; transform: translateY(-36px) rotate(0); }
+  35% { opacity: 1; transform: translateY(0) rotate(-8deg); }
+  70% { opacity: 1; transform: translateY(70px) rotate(12deg); }
+  100% { opacity: 0; transform: translateY(130px) rotate(30deg); }
 }
 .bell-hotspot {
-  top: 955px;
-  left: 34px;
+  top: 930px;
+  left: 30px;
 }
 .woodfish-hotspot {
-  top: 955px;
-  right: 34px;
+  top: 1040px;
+  right: 30px;
 }
 .fortune-hotspot {
-  top: 895px;
-  right: 34px;
+  top: 820px;
+  right: 30px;
 }
 
 /* ==========================================================================
@@ -781,41 +869,49 @@ body.obs-mode .stage-wrapper {
 .hud-gift-cards {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
 }
 
 .hud-gift-card {
   cursor: pointer;
-  background: rgba(24, 8, 5, 0.94);
-  border: 1.5px solid rgba(244, 193, 80, 0.55);
-  border-radius: 14px;
-  padding: 10px 12px;
+  font-family: inherit;
+  color: var(--gold-bright);
+  background: linear-gradient(180deg, rgba(88, 20, 12, 0.96) 0%, rgba(30, 7, 4, 0.96) 100%);
+  border: 1.5px solid rgba(244, 193, 80, 0.6);
+  border-radius: 16px;
+  padding: 8px 4px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 232, 158, 0.25), 0 4px 10px rgba(0, 0, 0, 0.4);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .hud-gift-card:hover {
   border-color: var(--gold-bright);
+  box-shadow: inset 0 1px 0 rgba(255, 232, 158, 0.35), 0 0 22px rgba(244, 193, 80, 0.4);
+}
+.hud-gift-card:active {
+  transform: scale(0.95);
 }
 .gift-coin-tag {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--muted-gold);
-  letter-spacing: 0.5px;
-}
-.gift-card-body {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 .gift-emoji {
-  font-size: 34px;
+  font-size: 38px;
+  line-height: 1;
 }
 .gift-title {
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--gold-bright);
+  white-space: nowrap;
 }
 
 /* Bảng TẤM LÒNG THÀNH bên phải đáy */
@@ -911,6 +1007,12 @@ body.obs-mode .stage-wrapper {
   border-radius: 24px;
   padding: 34px 42px;
   text-align: center;
+  box-shadow: 0 0 80px rgba(244, 193, 80, 0.45), 0 20px 60px rgba(0, 0, 0, 0.7);
+  transform: scale(0.9) translateY(30px);
+  transition: transform 0.35s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+.fortune-modal-overlay.visible .fortune-scroll-card {
+  transform: none;
 }
 .fortune-badge {
   display: inline-block;
@@ -954,6 +1056,27 @@ body.obs-mode .stage-wrapper {
   line-height: 1.45;
   color: #3d120d;
   font-weight: 600;
+}
+.fortune-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 24px;
+}
+.fortune-btn {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 800;
+  padding: 12px 24px;
+  border-radius: 999px;
+  color: #6b0f0a;
+  background: transparent;
+  border: 2px solid #8c1812;
+}
+.fortune-btn.primary {
+  color: var(--gold-bright);
+  background: linear-gradient(180deg, #a3201a, #6e0f0a);
 }
 
 .volume-control-row {
@@ -1015,6 +1138,7 @@ body.obs-mode .stage-wrapper {
    BẢNG ĐIỀU KHIỂN NHANH BÊN CẠNH MÀN HÌNH LIVE (QUICK RPC DOCK)
    ========================================================================== */
 .quick-dock {
+  display: none;
   width: 390px;
   max-height: 96vh;
   overflow-y: auto;
@@ -1022,7 +1146,6 @@ body.obs-mode .stage-wrapper {
   border: 1.5px solid rgba(244, 193, 80, 0.45);
   border-radius: 20px;
   padding: 20px;
-  display: flex;
   flex-direction: column;
   gap: 16px;
 }
@@ -1119,4 +1242,148 @@ body.obs-mode .stage-wrapper {
   background: rgba(255, 255, 255, 0.04);
   border-left: 3px solid var(--gold-main);
   color: #f3e5cf;
+}
+
+/* ==========================================================================
+   BẢNG ĐIỀU KHIỂN: ẨN/HIỆN, CỔNG VÀO CHÁNH ĐIỆN, MÀN HÌNH NHỎ (ĐIỆN THOẠI)
+   ========================================================================== */
+body.dock-open .quick-dock {
+  display: flex;
+}
+body.standalone .tiktok-only,
+body.realtime .tiktok-only,
+body.realtime #btnRpcGiftLotus,
+body.realtime #btnRpcGrandCeremony {
+  display: none !important;
+}
+
+.dock-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  background: rgba(26, 7, 5, 0.92);
+  border: 1.5px solid rgba(244, 193, 80, 0.6);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+body.obs-mode .dock-toggle {
+  display: none;
+}
+
+.welcome-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 30%, rgba(244, 193, 80, 0.18), rgba(10, 2, 1, 0.9) 65%);
+  backdrop-filter: blur(5px);
+}
+.welcome-gate[hidden] {
+  display: none;
+}
+.welcome-card {
+  width: 760px;
+  padding: 60px 56px 50px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  border-radius: 40px;
+  background: linear-gradient(180deg, rgba(58, 14, 8, 0.96), rgba(22, 5, 3, 0.97));
+  border: 3px solid rgba(244, 193, 80, 0.75);
+  box-shadow: 0 0 90px rgba(244, 193, 80, 0.35), 0 30px 80px rgba(0, 0, 0, 0.7);
+}
+.welcome-lotus {
+  font-size: 90px;
+  line-height: 1;
+}
+.welcome-card h1 {
+  font-family: 'Noto Serif', serif;
+  font-size: 58px;
+  font-weight: 900;
+  color: var(--gold-bright);
+}
+.welcome-card p {
+  font-size: 26px;
+  line-height: 1.5;
+  color: var(--muted-gold);
+}
+.welcome-card label {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted-gold);
+  text-align: left;
+}
+.welcome-card input {
+  user-select: text;
+  font: inherit;
+  font-size: 30px;
+  padding: 18px 24px;
+  border-radius: 18px;
+  color: var(--ivory);
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(244, 193, 80, 0.55);
+  outline: none;
+}
+.welcome-card input:focus {
+  border-color: var(--gold-bright);
+}
+.welcome-enter {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 32px;
+  font-weight: 800;
+  padding: 20px;
+  border-radius: 999px;
+  color: #2a0805;
+  border: 2px solid #fff3b0;
+  background: linear-gradient(180deg, #ffe89e 0%, #d89a1c 100%);
+  box-shadow: 0 8px 26px rgba(244, 193, 80, 0.4);
+}
+.welcome-card small {
+  font-size: 21px;
+  color: var(--muted-gold);
+}
+
+/* Chế độ thường: stage co theo chiều rộng nếu màn hình hẹp hơn tỉ lệ 9:16 */
+.stage-wrapper {
+  height: min(96vh, calc((100vw - 24px) * 16 / 9));
+}
+body.obs-mode .stage-wrapper {
+  height: 100vh;
+}
+@media (max-width: 899px) {
+  .app-workspace {
+    padding: 6px;
+  }
+  .stage-wrapper {
+    height: min(100vh, calc((100vw - 12px) * 16 / 9));
+    border-radius: 14px;
+  }
+  .quick-dock {
+    position: fixed;
+    z-index: 90;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    top: 64px;
+    width: auto;
+    max-height: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ritual-hotspot.tapped .hotspot-icon,
+  .ritual-hotspot.ringing .hotspot-icon,
+  .ritual-hotspot.shaking .hotspot-icon {
+    animation: none;
+  }
 }

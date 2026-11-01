@@ -11,6 +11,10 @@ Người xem trên TikTok Live tương tác trực tiếp qua **Bình luận (Co
 
 ---
 
+## 🕯️ Chế Độ Độc Lập (không cần TikTok, không cần server)
+
+Mở `public/` bằng bất kỳ static host nào (Cloudflare Pages, `python3 -m http.server -d public`...). Khi không tìm thấy server, giao diện tự chuyển sang chế độ độc lập: nhập pháp danh rồi **Xin xăm**, **Gõ mõ** (giữ để gõ liên tục), **Thỉnh chuông**, **Thắp hương**, **Thả hoa đăng**. Công đức lưu trong `localStorage`, giọng đọc dùng giọng tiếng Việt của trình duyệt. Ép chế độ này bằng `?standalone=1`.
+
 ## 📸 Hình Ảnh Demo Giao Diện
 
 ### 1. Màn hình Chánh Điện 9:16 & Bảng Điều Khiển Nhanh (`http://localhost:3000`)

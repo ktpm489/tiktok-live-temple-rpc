@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chùa Linh Ứng Online — TikTok Live RPC (Đức Phật A Di Đà 9:16)</title>
+  <title>Chùa Linh Ứng Online — Xin Xăm · Gõ Mõ · Thỉnh Chuông</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
@@ -53,6 +53,7 @@
           </div>
           <div class="top-Right-badges">
             <div class="mini-stat-pill">
+              <span hidden>🧘 <strong id="statOnline">1</strong> online •</span>
               🔥 <strong id="statIncense">108</strong> hương • ✨ <strong id="statMerit">1,080</strong> CĐ
             </div>
           </div>
@@ -66,20 +67,23 @@
         </div>
 
         <!-- PHÁP KHÍ TƯƠNG TÁC HAI BÊN BÀN THỜ: ĐẠI HỒNG CHUNG & MÕ GỖ & ỐNG XĂM -->
-        <div class="ritual-hotspot bell-hotspot" id="bellStation" title="Bấm để Thỉnh Đại Hồng Chung">
+        <button class="ritual-hotspot bell-hotspot" id="bellStation" type="button" title="Bấm để Thỉnh Đại Hồng Chung">
           <span class="hotspot-icon">🔔</span>
           <span class="hotspot-label">Thỉnh Chuông</span>
-        </div>
+        </button>
 
-        <div class="ritual-hotspot woodfish-hotspot" id="woodenFishStation" title="Bấm để Gõ Mõ Tích Công Đức">
+        <button class="ritual-hotspot woodfish-hotspot" id="woodenFishStation" type="button" title="Bấm (hoặc giữ) để Gõ Mõ Tích Công Đức">
           <span class="hotspot-icon">🪵</span>
-          <span class="hotspot-label">Gõ Mõ (<span id="statWoodenFish">360</span>)</span>
-        </div>
+          <span class="hotspot-label">Gõ Mõ <span id="statWoodenFish">360</span></span>
+        </button>
 
-        <div class="ritual-hotspot fortune-hotspot" id="fortuneCylinder" title="Bấm để Xin Xăm / Gieo Quẻ">
+        <button class="ritual-hotspot fortune-hotspot" id="fortuneCylinder" type="button" title="Bấm để Xin Xăm / Gieo Quẻ">
           <span class="hotspot-icon">🎋</span>
           <span class="hotspot-label">Xin Xăm</span>
-        </div>
+        </button>
+
+        <!-- QUE XĂM RƠI RA TỪ ỐNG XĂM KHI GIEO QUẺ -->
+        <div class="fortune-stick" id="fortuneStick"><span id="fortuneStickNum">1</span></div>
 
         <!-- 4. CHỦ LỄ ĐANG DÂNG HƯƠNG TRƯỚC LƯ HƯƠNG ĐỒNG (GIỮA CHÁNH ĐIỆN) -->
         <div class="central-worshipper" id="centralWorshipper">
@@ -133,29 +137,31 @@
             </div>
 
             <div class="hud-gift-cards">
-              <div class="hud-gift-card" id="cardIncense" title="Bấm để Thắp hương">
-                <div class="gift-coin-tag">1 COIN / CMT</div>
-                <div class="gift-card-body">
-                  <span class="gift-emoji">🔥</span>
-                  <span class="gift-title">Dâng hương</span>
-                </div>
-              </div>
-
-              <div class="hud-gift-card" id="cardBlessing" title="Bấm để Cầu phúc & Thả hoa đăng">
-                <div class="gift-coin-tag">5 COINS / TIM</div>
-                <div class="gift-card-body">
-                  <span class="gift-emoji">🏮</span>
-                  <span class="gift-title">Cầu phúc</span>
-                </div>
-              </div>
-
-              <div class="hud-gift-card" id="cardLotus" title="Bấm để Dâng Hoa Sen Vàng">
-                <div class="gift-coin-tag">10+ COINS</div>
-                <div class="gift-card-body">
-                  <span class="gift-emoji">🪷</span>
-                  <span class="gift-title">Hoa sen</span>
-                </div>
-              </div>
+              <button class="hud-gift-card" id="cardIncense" type="button" title="Thắp hương dâng Phật">
+                <span class="gift-emoji">🔥</span>
+                <span class="gift-title">Thắp hương</span>
+                <span class="gift-coin-tag">+15 CĐ</span>
+              </button>
+              <button class="hud-gift-card" id="cardFortune" type="button" title="Xin xăm / Gieo quẻ">
+                <span class="gift-emoji">🎋</span>
+                <span class="gift-title">Xin xăm</span>
+                <span class="gift-coin-tag">+10 CĐ</span>
+              </button>
+              <button class="hud-gift-card" id="cardWoodfish" type="button" title="Gõ mõ tích công đức (giữ để gõ liên tục)">
+                <span class="gift-emoji">🪵</span>
+                <span class="gift-title">Gõ mõ</span>
+                <span class="gift-coin-tag">+1 CĐ</span>
+              </button>
+              <button class="hud-gift-card" id="cardBell" type="button" title="Thỉnh Đại Hồng Chung">
+                <span class="gift-emoji">🔔</span>
+                <span class="gift-title">Thỉnh chuông</span>
+                <span class="gift-coin-tag">+10 CĐ</span>
+              </button>
+              <button class="hud-gift-card" id="cardBlessing" type="button" title="Cầu phúc & thả hoa đăng">
+                <span class="gift-emoji">🏮</span>
+                <span class="gift-title">Hoa đăng</span>
+                <span class="gift-coin-tag">+10 CĐ</span>
+              </button>
             </div>
           </div>
 
@@ -180,10 +186,29 @@
             <div class="fortune-devotee" id="fortuneDevotee">Thí chủ xin quẻ: Minh Tâm</div>
             <div class="fortune-poem" id="fortunePoem"></div>
             <div class="fortune-meaning" id="fortuneMeaning"></div>
+            <div class="fortune-actions">
+              <button type="button" class="fortune-btn" id="fortuneAgain">🎋 Xin quẻ khác</button>
+              <button type="button" class="fortune-btn primary" id="fortuneClose">🙏 Tạ ơn, đóng lại</button>
+            </div>
           </div>
+        </div>
+
+        <!-- CỔNG VÀO CHÁNH ĐIỆN (CHẾ ĐỘ ĐỘC LẬP: NHẬP PHÁP DANH, ĐỒNG THỜI MỞ ÂM THANH) -->
+        <div class="welcome-gate" id="welcomeGate" hidden>
+          <form class="welcome-card" id="welcomeForm">
+            <div class="welcome-lotus">🪷</div>
+            <h1>Chùa Linh Ứng Online</h1>
+            <p>Thành tâm vào chánh điện: thắp hương, xin xăm, gõ mõ, thỉnh chuông. Không cần đăng nhập, không cần TikTok.</p>
+            <label for="welcomeName">Pháp danh / Tên của bạn</label>
+            <input id="welcomeName" maxlength="26" autocomplete="nickname" placeholder="Ví dụ: Diệu Hạnh, Minh Tâm…" required />
+            <button type="submit" class="welcome-enter">Vào Chánh Điện</button>
+            <small>🔊 Bật loa để nghe chuông mõ và nhạc thiền</small>
+          </form>
         </div>
       </div>
     </div>
+
+    <button class="dock-toggle" id="dockToggle" type="button" aria-label="Mở bảng điều khiển">⚙️</button>
 
     <!-- ====================================================================
          BẢNG ĐIỀU KHIỂN NHANH RPC & GIẢ LẬP TRỰC TIẾP (ẨN KHI ?obs=1)
@@ -191,7 +216,7 @@
     <aside class="quick-dock" id="quickDock">
       <div class="dock-header">
         <div class="dock-title">🎛️ Điều Khiển Live & RPC</div>
-        <a href="/admin" target="_blank" class="dock-link">Mở Admin Đầy Đủ ↗</a>
+        <a href="/admin" target="_blank" class="dock-link tiktok-only">Mở Admin Đầy Đủ ↗</a>
       </div>
 
       <div class="dock-section">
@@ -219,7 +244,7 @@
         </div>
       </div>
 
-      <div class="dock-section">
+      <div class="dock-section tiktok-only">
         <div class="dock-section-title">📡 Kết Nối Phòng TikTok Live</div>
         <div class="dock-input-row">
           <input type="text" id="inputTikTokUser" class="dock-input" value="@zenfacts_vn" placeholder="Nhập @username hoặc link TikTok Live..." />
@@ -255,6 +280,8 @@
     </aside>
   </div>
 
+  <script src="/js/fortunes.js"></script>
+  <script src="/js/local-engine.js"></script>
   <script src="/js/audio.js"></script>
   <script src="/js/particles.js"></script>
   <script src="/js/live.js"></script>

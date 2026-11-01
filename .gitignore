@@ -1,9 +1,10 @@
-node_modules/
+*.log
+*.m4a
+.DS_Store
 .venv/
+.wrangler/
 data/
 dist/
 embedded-assets.js
-.DS_Store
-*.log
-*.m4a
+node_modules/
 public/assets/bg_chant.m4a
