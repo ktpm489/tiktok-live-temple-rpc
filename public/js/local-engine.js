@@ -56,6 +56,23 @@
 
   const state = load();
 
+  // Bảng vàng theo ngày / tuần (giờ Việt Nam, tuần bắt đầu từ thứ Hai), tự làm mới khi sang kỳ mới
+  function periodKeys(now = Date.now()) {
+    const d = new Date(now + 7 * 3600 * 1000);
+    const monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000);
+    return { day: d.toISOString().slice(0, 10), week: monday.toISOString().slice(0, 10) };
+  }
+  function rollPeriods() {
+    const now = periodKeys();
+    const p = state.periods || (state.periods = { day: '', week: '', daily: {}, weekly: {} });
+    if (p.day !== now.day) { p.day = now.day; p.daily = {}; }
+    if (p.week !== now.week) { p.week = now.week; p.weekly = {}; }
+  }
+  function topOf(map, limit = 5) {
+    return Object.values(map).sort((a, b) => b.merit - a.merit).slice(0, limit).map((e, i) => ({ rank: i + 1, name: e.name, merit: e.merit }));
+  }
+  rollPeriods();
+
   // Đạo tràng mới mở chưa có ai: thêm vài Phật tử mẫu để chánh điện không trống
   if (Object.keys(state.devotees).length === 0) {
     const SEED = [['Diệu Hạnh', 320], ['Minh Tâm', 260], ['Thiện Đức', 210], ['Huệ An', 175], ['Tịnh Nhã', 140], ['Quảng Trí', 120], ['Chơn Như', 95], ['Pháp Hỷ', 80], ['Nguyên Thanh', 66], ['Tâm Đăng', 52], ['Diệu Liên', 40], ['Trí Hải', 31], ['Phước Lộc', 22], ['Hạnh Nguyện', 15]];
@@ -93,6 +110,7 @@
       haloIntensity: state.haloIntensity,
       offerings: state.offerings,
       leaderboard: leaderboard(),
+      leaderboards: (rollPeriods(), { today: topOf(state.periods.daily), week: topOf(state.periods.weekly) }),
       recentEvents: state.recentEvents.slice(0, 15),
       settings: { autoSim: false },
       tiktok: { connected: false, connecting: false, username: '', viewerCount: 0 }
@@ -108,6 +126,12 @@
     dev.incense += incenseDelta;
     dev.gifts += giftDelta;
     if (wish) dev.lastWish = wish;
+    rollPeriods();
+    for (const map of [state.periods.daily, state.periods.weekly]) {
+      const e = map[key] || (map[key] = { name, merit: 0 });
+      e.name = name;
+      e.merit += meritDelta;
+    }
     state.totalMerit += meritDelta;
     state.haloIntensity = Math.min(1, 0.35 + (state.totalMerit % 1000) / 1400);
     return dev;

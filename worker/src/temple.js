@@ -35,6 +35,14 @@ const METHOD_GAP = {
   'temple.drawFortune': 8000
 };
 
+// Bảng vàng theo ngày / tuần tính theo giờ Việt Nam (UTC+7), tuần bắt đầu từ thứ Hai
+function periodKeys(now = Date.now()) {
+  const d = new Date(now + 7 * 3600 * 1000);
+  const day = d.toISOString().slice(0, 10);
+  const monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000);
+  return { day: `d:${day}`, week: `w:${monday.toISOString().slice(0, 10)}` };
+}
+
 const WOOD_BATCH_MS = 600;   // gom tiếng mõ của cả phòng thành 1 sự kiện
 const SAVE_GAP_MS = 2000;    // ghi SQLite tối đa mỗi 2 giây
 const MAX_DEVOTEES = 600;
@@ -67,11 +75,20 @@ export class Temple extends DurableObject {
     this.gaps = new WeakMap();
     this.lastFortune = -1;
     this.alarmAt = 0;
+    this.daily = new Map();
+    this.weekly = new Map();
+    this.dirtyPeriod = new Set(); // 'd|key' hoặc 'w|key'
+    this.periods = periodKeys();
 
     ctx.blockConcurrencyWhile(async () => {
       const sql = ctx.storage.sql;
       sql.exec('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)');
       sql.exec('CREATE TABLE IF NOT EXISTS devotees (k TEXT PRIMARY KEY, name TEXT NOT NULL, merit INTEGER NOT NULL, incense INTEGER NOT NULL, gifts INTEGER NOT NULL, wish TEXT NOT NULL)');
+      sql.exec('CREATE TABLE IF NOT EXISTS period_merit (period TEXT NOT NULL, k TEXT NOT NULL, name TEXT NOT NULL, merit INTEGER NOT NULL, PRIMARY KEY (period, k))');
+      sql.exec('DELETE FROM period_merit WHERE period NOT IN (?, ?)', this.periods.day, this.periods.week);
+      for (const r of sql.exec('SELECT period, k, name, merit FROM period_merit').toArray()) {
+        (r.period === this.periods.day ? this.daily : this.weekly).set(r.k, { name: r.name, merit: r.merit });
+      }
       const row = sql.exec("SELECT v FROM meta WHERE k = 'counters'").toArray()[0];
       if (row) this.counters = { ...DEFAULT_COUNTERS, ...JSON.parse(row.v) };
       for (const d of sql.exec('SELECT k, name, merit, incense, gifts, wish FROM devotees').toArray()) {
@@ -165,6 +182,14 @@ export class Temple extends DurableObject {
     if (wish) d.wish = wish;
     this.devotees.set(key, d);
     this.dirtyDevotees.add(key);
+    this.rollPeriods();
+    for (const [scope, map] of [['d', this.daily], ['w', this.weekly]]) {
+      const e = map.get(key) || { name: user, merit: 0 };
+      e.name = user;
+      e.merit += merit;
+      map.set(key, e);
+      this.dirtyPeriod.add(`${scope}|${key}`);
+    }
     this.counters.totalMerit += merit;
     this.countersDirty = true;
     this.scheduleTick(SAVE_GAP_MS);
@@ -250,7 +275,29 @@ export class Temple extends DurableObject {
     }
   }
 
+  // Sang ngày/tuần mới thì bảng tương ứng được làm mới từ đầu
+  rollPeriods() {
+    const now = periodKeys();
+    if (now.day !== this.periods.day) {
+      this.daily.clear();
+      this.dirtyPeriod = new Set([...this.dirtyPeriod].filter((x) => !x.startsWith('d|')));
+    }
+    if (now.week !== this.periods.week) {
+      this.weekly.clear();
+      this.dirtyPeriod = new Set([...this.dirtyPeriod].filter((x) => !x.startsWith('w|')));
+    }
+    if (now.day !== this.periods.day || now.week !== this.periods.week) {
+      this.periods = now;
+      this.ctx.storage.sql.exec('DELETE FROM period_merit WHERE period NOT IN (?, ?)', now.day, now.week);
+    }
+  }
+
+  topOf(map, limit = 5) {
+    return [...map.values()].sort((a, b) => b.merit - a.merit).slice(0, limit).map((e, i) => ({ rank: i + 1, name: e.name, merit: e.merit }));
+  }
+
   publicState() {
+    this.rollPeriods();
     const sockets = this.ctx.getWebSockets();
     const online = new Map();
     for (const ws of sockets) {
@@ -261,14 +308,14 @@ export class Temple extends DurableObject {
     // Bảng vàng theo công đức, sau đó thêm người đang online chưa có công đức để họ thấy mình trong đạo tràng
     const ranked = [...this.devotees.entries()].sort((a, b) => b[1].merit - a[1].merit).slice(0, 24);
     const seen = new Set(ranked.map(([k]) => k));
-    const hall = ranked.map(([k, d]) => ({ name: d.name, merit: d.merit, incense: d.incense, lastWish: d.wish, key: k }));
+    const hall = ranked.map(([k, d]) => ({ name: d.name, merit: d.merit, incense: d.incense, lastWish: d.wish, key: k, online: online.has(k) }));
     for (const [k, name] of online) {
       if (hall.length >= MAX_HALL) break;
       if (seen.has(k)) continue;
       const d = this.devotees.get(k);
-      hall.push({ name, merit: d ? d.merit : 0, incense: d ? d.incense : 0, lastWish: d ? d.wish : '', key: k });
+      hall.push({ name, merit: d ? d.merit : 0, incense: d ? d.incense : 0, lastWish: d ? d.wish : '', key: k, online: true });
     }
-    const leaderboard = hall.map((d, i) => ({ rank: i + 1, name: d.name, uniqueId: d.key.replace(/\s+/g, ''), avatar: '', merit: d.merit, incense: d.incense, lastWish: d.lastWish }));
+    const leaderboard = hall.map((d, i) => ({ rank: i + 1, name: d.name, uniqueId: d.key.replace(/\s+/g, ''), avatar: '', merit: d.merit, incense: d.incense, lastWish: d.lastWish, online: d.online }));
 
     return {
       realtime: true,
@@ -276,6 +323,7 @@ export class Temple extends DurableObject {
       ...this.counters,
       haloIntensity: Math.min(1, 0.35 + (this.counters.totalMerit % 1000) / 1400),
       leaderboard,
+      leaderboards: { today: this.topOf(this.daily), week: this.topOf(this.weekly) },
       recentEvents: this.recentEvents.slice(0, 15),
       settings: { autoSim: false },
       tiktok: { connected: false, connecting: false, username: '', viewerCount: 0 }
@@ -297,15 +345,15 @@ export class Temple extends DurableObject {
     if (this.pendingWood) {
       const w = this.pendingWood;
       this.pendingWood = null;
-      this.emit({ type: 'strikeWoodenFish', user: w.last, count: Math.min(w.count, 50), merit: w.count, users: w.users.size, ttsText: '' }, '');
+      this.emit({ type: 'strikeWoodenFish', user: w.last, count: Math.min(w.count, 50), merit: w.count, users: w.users.size, names: [...w.users].slice(0, 6), ttsText: '' }, '');
       this.lastOnline = online;
     } else if (online !== this.lastOnline) {
       this.lastOnline = online;
       this.broadcastState();
     }
 
-    if ((this.countersDirty || this.dirtyDevotees.size) && Date.now() - this.lastSave >= SAVE_GAP_MS) this.save();
-    if (this.countersDirty || this.dirtyDevotees.size || this.pendingWood) this.scheduleTick(SAVE_GAP_MS);
+    if ((this.countersDirty || this.dirtyDevotees.size || this.dirtyPeriod.size) && Date.now() - this.lastSave >= SAVE_GAP_MS) this.save();
+    if (this.countersDirty || this.dirtyDevotees.size || this.dirtyPeriod.size || this.pendingWood) this.scheduleTick(SAVE_GAP_MS);
   }
 
   save() {
@@ -315,6 +363,11 @@ export class Temple extends DurableObject {
       for (const k of this.dirtyDevotees) {
         const d = this.devotees.get(k);
         if (d) sql.exec('INSERT OR REPLACE INTO devotees (k, name, merit, incense, gifts, wish) VALUES (?, ?, ?, ?, ?, ?)', k, d.name, d.merit, d.incense, d.gifts, d.wish);
+      }
+      for (const ref of this.dirtyPeriod) {
+        const [scope, k] = ref.split('|');
+        const e = (scope === 'd' ? this.daily : this.weekly).get(k);
+        if (e) sql.exec('INSERT OR REPLACE INTO period_merit (period, k, name, merit) VALUES (?, ?, ?, ?)', scope === 'd' ? this.periods.day : this.periods.week, k, e.name, e.merit);
       }
       if (this.devotees.size > MAX_DEVOTEES) {
         const online = new Set(this.ctx.getWebSockets().map((ws) => keyOf((ws.deserializeAttachment() || {}).name || '')));
@@ -326,6 +379,7 @@ export class Temple extends DurableObject {
       }
     });
     this.dirtyDevotees.clear();
+    this.dirtyPeriod.clear();
     this.countersDirty = false;
     this.lastSave = Date.now();
   }

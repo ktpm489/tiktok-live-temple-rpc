@@ -89,15 +89,24 @@
     { x: 940, y: 1188, rank: 6 }
   ];
 
+  // Phần tử VIP / chỗ ngồi theo tên (viết thường) để hoạt cảnh nhắm đúng nhân vật của người đang hành lễ
+  const vipByName = new Map();
+  let lastVipSig = '';
+
   function renderVipCushions(leaderboard = []) {
     const layer = document.getElementById('vipCushionsLayer');
     if (!layer) return;
+
+    // Chỉ dựng lại khi danh sách tên đổi, để không làm mất hoạt cảnh đang chạy mỗi lần công đức nhích lên
+    const sig = leaderboard.slice(0, VIP_CUSHION_COORDS.length).map((d) => d.name).join('|');
+    if (sig === lastVipSig && layer.children.length > 0) return;
+    lastVipSig = sig;
 
     layer.innerHTML = VIP_CUSHION_COORDS.map((slot, idx) => {
       const dev = leaderboard[idx];
       if (!dev) return '';
       return `
-        <div class="vip-devotee-slot" style="left: ${slot.x}px; top: ${slot.y}px; z-index: ${12 + idx};">
+        <div class="vip-devotee-slot" data-name="${escapeHtml(String(dev.name).toLowerCase())}" style="left: ${slot.x}px; top: ${slot.y}px; z-index: ${12 + idx};">
           <img src="/assets/devotee.png" alt="VIP Devotee" class="devotee-sprite" />
           <div class="vip-rank-pill">
             <span class="vip-rank-num">${slot.rank}</span>
@@ -106,6 +115,9 @@
         </div>
       `;
     }).join('');
+
+    vipByName.clear();
+    layer.querySelectorAll('.vip-devotee-slot').forEach((el) => vipByName.set(el.dataset.name, el));
   }
 
   // 5. Dựng Đạo Tràng 40 Phật Tử Quỳ Lễ Hai Bên Thảm Đỏ (5 Hàng x 4 Cột mỗi bên)
@@ -140,58 +152,52 @@
     }
   })();
 
-  let lastRenderedLeaderboardJson = '';
+  // 40 chỗ ngồi chỉ dựng DOM một lần; sau đó chỉ đổi thẻ tên (nhẹ máy, không làm mất hoạt cảnh)
+  // Những ghế gần thảm đỏ dễ nhìn nhất được gắn thẻ tên trước
+  const LABELED_SEAT_ORDER = [3, 4, 11, 12, 19, 20, 27, 28, 35, 36, 2, 5, 10, 13, 18, 21, 26, 29];
+  const seatByName = new Map();
+  let seatEls = [];
+  let lastHallSig = '';
+
+  if (congregationHall) {
+    congregationHall.innerHTML = HALL_SEAT_COORDS.map((seat, idx) => `
+      <div class="hall-seat" style="left: ${seat.x}px; top: ${seat.y}px; z-index: ${20 + seat.row * 2}; transform: translate(-50%, -100%) scale(${seat.scale});">
+        <img src="/assets/devotee.png" alt="Phật tử" class="devotee-sprite" decoding="async" />
+        <div class="seat-badge" hidden>
+          <span class="seat-avatar"></span>
+          <span class="seat-username"></span>
+        </div>
+      </div>
+    `).join('');
+    seatEls = [...congregationHall.children];
+  }
 
   function renderCongregationHall(leaderboard = []) {
-    if (!congregationHall) return;
-    // Những người xếp từ hạng 7 trở đi ngồi ở các vị trí đầu tiên cạnh thảm đỏ
-    const hallViewers = leaderboard.slice(6);
-    const sig = JSON.stringify(hallViewers.map((d) => `${d.name}:${d.merit}`));
-    if (sig === lastRenderedLeaderboardJson && congregationHall.children.length > 0) return;
-    lastRenderedLeaderboardJson = sig;
+    if (!seatEls.length) return;
+    // Hạng 1-6 ngồi đệm VIP; từ hạng 7 trở đi ngồi đạo tràng, người đang online được xếp lên trước
+    const hallViewers = leaderboard.slice(6).sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
+    const shown = hallViewers.slice(0, LABELED_SEAT_ORDER.length);
+    const sig = shown.map((d) => d.name).join('|');
+    if (sig === lastHallSig) return;
+    lastHallSig = sig;
 
-    // Ưu tiên gắn thẻ tên vào các ghế gần thảm đỏ dễ nhìn nhất
-    const labeledSeatIndices = [
-      3, 4, 11, 12, 19, 20, 27, 28, 35, 36, 2, 5, 10, 13, 18, 21, 26, 29
-    ];
-    const seatViewerMap = new Map();
-    hallViewers.forEach((viewer, idx) => {
-      if (idx < labeledSeatIndices.length) {
-        seatViewerMap.set(labeledSeatIndices[idx], viewer);
+    seatByName.clear();
+    LABELED_SEAT_ORDER.forEach((seatIdx, i) => {
+      const el = seatEls[seatIdx];
+      if (!el) return;
+      const badge = el.querySelector('.seat-badge');
+      const viewer = shown[i];
+      badge.hidden = !viewer;
+      if (!viewer) return;
+      const av = badge.querySelector('.seat-avatar');
+      if (viewer.avatar) {
+        av.innerHTML = `<img src="${escapeHtml(viewer.avatar)}" alt="" />`;
+      } else {
+        av.textContent = String(viewer.name || 'P').charAt(0).toUpperCase();
       }
+      badge.querySelector('.seat-username').textContent = shortenName(viewer.name, 11);
+      seatByName.set(String(viewer.name).toLowerCase(), el);
     });
-
-    congregationHall.innerHTML = HALL_SEAT_COORDS.map((seat, idx) => {
-      const viewer = seatViewerMap.get(idx);
-      const badgeHtml = viewer
-        ? `
-          <div class="seat-badge">
-            <span class="seat-avatar">${
-              viewer.avatar
-                ? `<img src="${escapeHtml(viewer.avatar)}" alt="" />`
-                : escapeHtml(String(viewer.name || 'P').charAt(0).toUpperCase())
-            }</span>
-            <span class="seat-username">${escapeHtml(shortenName(viewer.name, 11))}</span>
-          </div>
-        `
-        : '';
-
-      return `
-        <div
-          class="hall-seat"
-          data-seat-idx="${idx}"
-          style="left: ${seat.x}px; top: ${seat.y}px; z-index: ${20 + seat.row * 2}; transform: translate(-50%, -100%) scale(${seat.scale});"
-        >
-          <img
-            src="/assets/devotee.png"
-            alt="Phật tử"
-            class="devotee-sprite"
-            style="animation-delay: ${((idx * 0.27) % 3.5).toFixed(2)}s;"
-          />
-          ${badgeHtml}
-        </div>
-      `;
-    }).join('');
   }
 
   // Preload toàn bộ 8 frame nhân vật vào bộ nhớ để chuyển frame mượt 0ms
@@ -224,6 +230,37 @@
       setTimeout(() => { img.src = SPRITE_FRAMES.bowMid; }, delay + 620);
       setTimeout(() => { img.src = SPRITE_FRAMES.kneel; }, delay + 780);
     });
+  }
+
+  // Người nào hành lễ thì chính nhân vật của người đó ngồi trong đạo tràng làm theo (gõ mõ, lạy...)
+  const SEAT_ACTION_ICON = { strikeWoodenFish: '🪵', ringBell: '🔔', burnIncense: '🔥', sendPrayer: '🏮', drawFortune: '🎋', offerGift: '🪷', grandCeremony: '🐉' };
+
+  function playSeatAction(name, type) {
+    const key = String(name || '').toLowerCase();
+    const el = seatByName.get(key) || vipByName.get(key);
+    const img = el && el.querySelector('.devotee-sprite');
+    if (!img) return false;
+
+    const bubble = document.createElement('span');
+    bubble.className = 'seat-act';
+    bubble.textContent = SEAT_ACTION_ICON[type] || '🙏';
+    el.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 1300);
+    el.classList.add('acting');
+    clearTimeout(el._actTimer);
+    el._actTimer = setTimeout(() => el.classList.remove('acting'), 1300);
+
+    if (type === 'strikeWoodenFish') {
+      img.classList.remove('act-wood');
+      void img.offsetWidth;
+      img.classList.add('act-wood');
+    } else if (!img._bowing) {
+      img._bowing = true;
+      const steps = [[0, 'forehead'], [150, 'bowMid'], [300, 'prostrateDeep'], [650, 'bowMid'], [800, 'kneel']];
+      steps.forEach(([t, pose]) => setTimeout(() => { img.src = SPRITE_FRAMES[pose]; }, t));
+      setTimeout(() => { img._bowing = false; }, 850);
+    }
+    return true;
   }
 
   let prostrationTimers = [];
@@ -382,22 +419,10 @@
       );
     }
 
-    // Cập nhật Bảng TẤM LÒNG THÀNH ở góc dưới phải (Top 4)
-    const lbList = document.getElementById('leaderboardList');
-    if (lbList) {
-      lbList.innerHTML = lb
-        .slice(0, 4)
-        .map(
-          (item) => `
-          <div class="leader-item">
-            <span class="leader-rank">${item.rank}</span>
-            <span class="leader-name">${escapeHtml(shortenName(item.name, 14))}</span>
-            <span class="leader-merit">${Number(item.merit).toLocaleString('vi-VN')}</span>
-          </div>
-        `
-        )
-        .join('');
-    }
+    // Bảng TẤM LÒNG THÀNH ở góc dưới phải (Top 4) theo tab Hôm nay / Tuần / Tổng
+    lastBoards = { all: lb, today: st.leaderboards?.today, week: st.leaderboards?.week };
+    document.getElementById('lbTabs').hidden = !st.leaderboards; // server TikTok gốc chỉ có bảng tổng
+    renderLeaderboardList();
 
     // Trạng thái kết nối TikTok Live
     const liveDot = document.getElementById('liveDot');
@@ -451,6 +476,40 @@
     }
   }
 
+  // Bảng vàng nhiều kỳ: người mới vẫn có cơ hội lên top "Hôm nay"
+  let lastBoards = {};
+  let lbTab = 'today';
+  try { lbTab = localStorage.getItem('temple_lb_tab') || 'today'; } catch (_) {}
+
+  function renderLeaderboardList() {
+    const lbList = document.getElementById('leaderboardList');
+    if (!lbList) return;
+    const tab = lastBoards.today || lastBoards.week ? lbTab : 'all';
+    document.querySelectorAll('#lbTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    const items = (lastBoards[tab] || []).slice(0, 4);
+    if (items.length === 0) {
+      lbList.innerHTML = `<div class="lb-empty">Chưa có ai ${tab === 'week' ? 'tuần này' : 'hôm nay'}.<br>Hãy là người đầu tiên 🙏</div>`;
+      return;
+    }
+    lbList.innerHTML = items
+      .map((item, i) => `
+        <div class="leader-item">
+          <span class="leader-rank">${item.rank || i + 1}</span>
+          <span class="leader-name">${escapeHtml(shortenName(item.name, 14))}</span>
+          <span class="leader-merit">${Number(item.merit).toLocaleString('vi-VN')}</span>
+        </div>
+      `)
+      .join('');
+  }
+
+  document.getElementById('lbTabs')?.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    lbTab = b.dataset.tab;
+    try { localStorage.setItem('temple_lb_tab', lbTab); } catch (_) {}
+    renderLeaderboardList();
+  });
+
   function formatEventSummary(ev) {
     switch (ev.type) {
       case 'burnIncense':
@@ -480,6 +539,9 @@
 
     // Phòng realtime: chỉ người thực hiện mới nghe lời đọc / thấy tờ quẻ, người khác chỉ thấy hiệu ứng chung
     const mine = !realtime || !ev.clientId || ev.clientId === clientId;
+
+    // Nhân vật trong đạo tràng làm theo (sự kiện gõ mõ gom có thể có nhiều người)
+    (ev.names && ev.names.length ? ev.names : [ev.user]).forEach((n) => playSeatAction(n, ev.type));
 
     if (ev.ttsText && ev.type !== 'drawFortune' && mine) {
       audio.enqueueTts(ev.ttsText, { voice: ev.ttsVoice || 'maichi' });

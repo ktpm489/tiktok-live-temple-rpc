@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Noto+Serif:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="/assets/amitabha_stage.jpg" imagesrcset="/assets/stage_540.jpg 540w, /assets/amitabha_stage.jpg 810w" imagesizes="(max-width: 700px) 50vw, 540px" fetchpriority="high">
+  <link rel="preload" as="image" href="/assets/devotee.png">
   <link rel="stylesheet" href="/css/live.css" />
 </head>
 <body>
@@ -18,7 +20,11 @@
       <div class="stage-9x16" id="stage9x16">
         <!-- 1. HÌNH NỀN CHÁNH ĐIỆN ĐỨC PHẬT A DI ĐÀ 8K SẮC NÉT -->
         <img
-          src="/assets/amitabha_stage.png"
+          src="/assets/amitabha_stage.jpg"
+          srcset="/assets/stage_540.jpg 540w, /assets/amitabha_stage.jpg 810w"
+          sizes="(max-width: 700px) 50vw, 540px"
+          fetchpriority="high"
+          decoding="async"
           alt="Đức Phật A Di Đà Chánh Điện"
           class="sanctuary-bg-img"
         />
@@ -168,6 +174,11 @@
           <!-- Bên phải: Bảng TẤM LÒNG THÀNH (Top Công Đức) -->
           <div class="hud-right-leaderboard">
             <div class="hud-lb-header">TẤM LÒNG THÀNH</div>
+            <div class="hud-lb-tabs" id="lbTabs">
+              <button type="button" data-tab="today">Hôm nay</button>
+              <button type="button" data-tab="week">Tuần</button>
+              <button type="button" data-tab="all">Tổng</button>
+            </div>
             <div class="hud-lb-list" id="leaderboardList"></div>
           </div>
         </footer>

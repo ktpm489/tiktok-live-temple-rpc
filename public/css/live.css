@@ -683,6 +683,10 @@ body.obs-mode .stage-wrapper {
   height: 120px;
 }
 
+.seat-badge[hidden] {
+  display: none;
+}
+
 .seat-badge {
   display: inline-flex;
   align-items: center;
@@ -927,13 +931,45 @@ body.obs-mode .stage-wrapper {
 .hud-lb-header {
   text-align: center;
   font-family: 'Noto Serif', serif;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 900;
   color: var(--gold-bright);
   letter-spacing: 1.5px;
-  padding-bottom: 6px;
+  padding-bottom: 4px;
   margin-bottom: 6px;
   border-bottom: 1px solid rgba(244, 193, 80, 0.3);
+}
+
+.hud-lb-tabs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.hud-lb-tabs[hidden] {
+  display: none;
+}
+.hud-lb-tabs button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 2px 12px;
+  border-radius: 999px;
+  color: var(--muted-gold);
+  background: transparent;
+  border: 1px solid rgba(244, 193, 80, 0.4);
+}
+.hud-lb-tabs button.active {
+  color: #2a0805;
+  background: linear-gradient(180deg, #ffe89e, #d89a1c);
+  border-color: #fff3b0;
+}
+.lb-empty {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--muted-gold);
 }
 
 .hud-lb-list {
@@ -1384,6 +1420,48 @@ body.obs-mode .stage-wrapper {
   .ritual-hotspot.tapped .hotspot-icon,
   .ritual-hotspot.ringing .hotspot-icon,
   .ritual-hotspot.shaking .hotspot-icon {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   HOẠT CẢNH PHẬT TỬ TRONG ĐẠO TRÀNG (AI ĐANG LÀM GÌ THÌ NHÂN VẬT ĐÓ HÀNH LỄ)
+   ========================================================================== */
+.hall-seat,
+.vip-devotee-slot {
+  contain: layout style;
+}
+.seat-act {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  z-index: 5;
+  font-size: 34px;
+  line-height: 1;
+  pointer-events: none;
+  animation: seatAct 1.2s ease-out forwards;
+}
+@keyframes seatAct {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
+  25% { opacity: 1; transform: translate(-50%, -6px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+}
+.devotee-sprite.act-wood {
+  animation: seatWood 0.26s ease-out 3;
+}
+@keyframes seatWood {
+  0%, 100% { transform: none; }
+  35% { transform: translateY(5px) scaleY(0.94); }
+  65% { transform: translateY(-2px); }
+}
+.hall-seat.acting .seat-badge,
+.vip-devotee-slot.acting .vip-rank-pill {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 16px rgba(255, 224, 130, 0.9);
+}
+@media (prefers-reduced-motion: reduce) {
+  .devotee-sprite.act-wood,
+  .seat-act {
     animation: none;
   }
 }
